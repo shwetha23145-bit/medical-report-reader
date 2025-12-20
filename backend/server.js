@@ -1,19 +1,35 @@
 const express = require("express");
+const multer = require("multer");
+const pdfParse = require("pdf-parse");
+const Tesseract = require("tesseract.js");
 const cors = require("cors");
+const fs = require("fs");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
 
-app.post("/analyze", (req, res) => {
-    const report = req.body.report;
+const upload = multer({ dest: "uploads/" });
 
-    res.json({
-    summary:
-        "The uploaded medical report has been analyzed. No major abnormalities detected.",
-    });
+app.post("/upload", upload.single("report"), async (req, res) => {
+    try {
+    const file = req.file;
+    let text = "";
+
+    if (file.mimetype === "application/pdf") {
+        const buffer = fs.readFileSync(file.path);
+        const data = await pdfParse(buffer);
+        text = data.text;
+    } else {
+        const result = await Tesseract.recognize(file.path, "eng");
+        text = result.data.text;
+    }
+
+    res.json({ text });
+    } catch (error) {
+    res.status(500).json({ error: "Failed to read medical report" });
+    }
 });
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log("Backend server running on port ${PORT}");
+
+app.listen(5000, () => {
+    console.log("Backend running on port 5000");
 });
